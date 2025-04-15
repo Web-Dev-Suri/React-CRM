@@ -17,6 +17,7 @@ const express_1 = __importDefault(require("express"));
 const client_1 = require("@prisma/client");
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const nodemailer_1 = __importDefault(require("nodemailer"));
 dotenv_1.default.config();
 const prisma = new client_1.PrismaClient();
 const app = (0, express_1.default)();
@@ -25,12 +26,25 @@ const port = process.env.PORT || 5000;
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
+// Nodemailer setup
+const transporter = nodemailer_1.default.createTransport({
+    service: 'Gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+    },
+});
 // Lead creation endpoint
 app.post('/api/leads', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { name, email, phone, company, status, assignedTo } = req.body;
+        // Validation
         if (!name) {
             return res.status(400).json({ error: 'Name is required' });
+        }
+        // Validate email format if provided
+        if (assignedTo && !/\S+@\S+\.\S+/.test(assignedTo)) {
+            return res.status(400).json({ error: 'Invalid email format for assigned user' });
         }
         const lead = yield prisma.lead.create({
             data: {
@@ -42,6 +56,31 @@ app.post('/api/leads', (req, res) => __awaiter(void 0, void 0, void 0, function*
                 assignedTo: assignedTo || 'Unassigned'
             }
         });
+        // Send email notification if assigned
+        if (assignedTo && assignedTo !== 'Unassigned') {
+            try {
+                yield transporter.sendMail({
+                    from: `CRM System <${process.env.EMAIL_USER}>`,
+                    to: assignedTo,
+                    subject: 'New Lead Assignment',
+                    html: `
+            <h3>New Lead Assigned</h3>
+            <p>You have been assigned a new lead:</p>
+            <ul>
+              <li><strong>Name:</strong> ${name}</li>
+              ${company ? `<li><strong>Company:</strong> ${company}</li>` : ''}
+              ${email ? `<li><strong>Email:</strong> ${email}</li>` : ''}
+              ${phone ? `<li><strong>Phone:</strong> ${phone}</li>` : ''}
+              <li><strong>Status:</strong> ${status || 'New'}</li>
+            </ul>
+            <p>Please follow up with this lead promptly.</p>
+          `
+                });
+            }
+            catch (emailError) {
+                console.error('Failed to send assignment email:', emailError);
+            }
+        }
         res.status(201).json(lead);
     }
     catch (error) {
