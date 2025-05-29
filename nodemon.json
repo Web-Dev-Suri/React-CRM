@@ -1,6 +1,0 @@
-{
-    "watch": ["src"],
-    "ext": "ts,json,prisma",
-    "ignore": ["src/**/*.spec.ts", "src/**/*.test.ts"],
-    "exec": "ts-node --files src/server.ts"
-  }
