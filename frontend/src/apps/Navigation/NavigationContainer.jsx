@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Button, Drawer, Layout, Menu } from 'antd';
+import { Button, Drawer, Layout, Menu, Tooltip, Divider } from 'antd';
 
 import { useAppContext } from '@/context/appContext';
 
 import useLanguage from '@/locale/useLanguage';
-import logoIcon from '@/style/images/logo-icon.png';
-import logoText from '@/style/images/logo-text.png';
 
 import useResponsive from '@/hooks/useResponsive';
 
 import Integrations from '@/pages/Integrations';
+
+import './NavigationContainer.css';
 
 import {
   DatabaseOutlined,
@@ -39,71 +39,50 @@ export default function Navigation() {
   return isMobile ? <MobileSidebar /> : <Sidebar collapsible={false} />;
 }
 
-function Sidebar({ collapsible, isMobile = false }) {
-  let location = useLocation();
-
-  const { state: stateApp, appContextAction } = useAppContext();
-  const { isNavMenuClose } = stateApp;
-  const { navMenu } = appContextAction;
-  const [showLogoApp, setLogoApp] = useState(isNavMenuClose);
+function Sidebar({ isMobile = false }) {
+  const location = useLocation();
+  const { state: stateApp } = useAppContext();
+  const [collapsed, setCollapsed] = useState(true); // Sidebar stays collapsed
   const [currentPath, setCurrentPath] = useState(location.pathname.slice(1));
-
   const translate = useLanguage();
   const navigate = useNavigate();
 
   const items = [
     {
       key: 'dashboard',
-      icon: <DashboardOutlined />,
-      label: <Link to={'/'}>{translate('dashboard')}</Link>,
+      icon: <DashboardOutlined style={{ color: '#fff', fontSize: 22 }} />,
+      title: translate('dashboard'),
+      onClick: () => navigate('/'),
     },
-    {
+     {
       key: 'leads',
-      icon: <DatabaseOutlined />,
-      label: <Link to={'/customer'}>{translate('leads')}</Link>,
+      icon: <DatabaseOutlined style={{ color: '#fff', fontSize: 22 }} />,
+      title: translate('leads'),
+      onClick: () => navigate('/customer'),
     },
-
     // {
-    //   key: 'invoice',
-    //   icon: <ContainerOutlined />,
-    //   label: <Link to={'/invoice'}>{translate('invoices')}</Link>,
+    //   key: 'payment',
+    //   icon: <CreditCardOutlined style={{ color: '#fff', fontSize: 22 }} />,
+    //   title: translate('payments'),
+    //   onClick: () => navigate('/payment'),
     // },
-    // {
-    //   key: 'quote',
-    //   icon: <FileSyncOutlined />,
-    //   label: <Link to={'/quote'}>{translate('quote')}</Link>,
-    // },
-    {
-      key: 'payment',
-      icon: <CreditCardOutlined />,
-      label: <Link to={'/payment'}>{translate('payments')}</Link>,
-    },
-
     {
       key: 'integrations',
-      icon: <ContainerOutlined />,
-      label: <Link to={'/integrations'}>{translate('integrations')}</Link>,
+      icon: <ContainerOutlined style={{ color: '#fff', fontSize: 22 }} />,
+      title: translate('integrations'),
+      onClick: () => navigate('/integrations'),
     },
-
-    {
-      key: 'paymentMode',
-      label: <Link to={'/payment/mode'}>{translate('payments_mode')}</Link>,
-      icon: <WalletOutlined />,
-    },
-    // {
-    //   key: 'taxes',
-    //   label: <Link to={'/taxes'}>{translate('taxes')}</Link>,
-    //   icon: <ShopOutlined />,
-    // },
     {
       key: 'generalSettings',
-      label: <Link to={'/settings'}>{translate('settings')}</Link>,
-      icon: <SettingOutlined />,
+      icon: <SettingOutlined style={{ color: '#fff', fontSize: 22 }} />,
+      title: translate('settings'),
+      onClick: () => navigate('/settings'),
     },
     {
       key: 'about',
-      label: <Link to={'/about'}>{translate('about')}</Link>,
-      icon: <ReconciliationOutlined />,
+      icon: <ReconciliationOutlined style={{ color: '#fff', fontSize: 22 }} />,
+      title: translate('about'),
+      onClick: () => navigate('/about'),
     },
   ];
 
@@ -116,72 +95,39 @@ function Sidebar({ collapsible, isMobile = false }) {
       }
   }, [location, currentPath]);
 
-  useEffect(() => {
-    if (isNavMenuClose) {
-      setLogoApp(isNavMenuClose);
-    }
-    const timer = setTimeout(() => {
-      if (!isNavMenuClose) {
-        setLogoApp(isNavMenuClose);
-      }
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [isNavMenuClose]);
-  const onCollapse = () => {
-    navMenu.collapse();
-  };
-
+  // Sidebar always collapsed, no hover expand
   return (
     <Sider
-      collapsible={collapsible}
-      collapsed={collapsible ? isNavMenuClose : collapsible}
-      onCollapse={onCollapse}
+      collapsed={true}
+      collapsible
+      trigger={null}
       className="navigation"
       width={256}
+      collapsedWidth={'3%'}
       style={{
-        overflow: 'auto',
+        background: '#1778f2',
         height: '100vh',
-
-        position: isMobile ? 'absolute' : 'relative',
+        position: isMobile ? 'relative' : 'fixed',
         bottom: '20px',
-        ...(!isMobile && {
-          // border: 'none',
-          ['left']: '20px',
-          top: '20px',
-          // borderRadius: '8px',
-        }),
+        transition: 'all 0.2s',
+        overflow: 'hidden',
+        zIndex: 10,
       }}
       theme={'light'}
     >
-      <div
-        className="logo"
-        onClick={() => navigate('/')}
-        style={{
-          cursor: 'pointer',
-        }}
-      >
-        <img src={logoIcon} alt="Logo" style={{ marginLeft: '-5px', height: '40px' }} />
-
-        {!showLogoApp && (
-          <img
-            src={logoText}
-            alt="Logo"
-            style={{
-              marginTop: '3px',
-              marginLeft: '10px',
-              height: '38px',
-            }}
-          />
-        )}
-      </div>
       <Menu
         items={items}
         mode="inline"
-        theme={'light'}
+        theme={'dark'}
         selectedKeys={[currentPath]}
+        inlineCollapsed={true}
         style={{
-          width: 256,
+          background: '#1778f2',
+          borderRight: 0,
+          paddingTop: 60,
         }}
+        // Custom render for dividers and spacing
+        itemRender={(item, dom) => <div style={{ marginBottom: 16 }}>{dom}</div>}
       />
     </Sider>
   );

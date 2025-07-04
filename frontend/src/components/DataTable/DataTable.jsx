@@ -1,4 +1,7 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+
+import moment from 'moment';
+
 
 import {
   EyeOutlined,
@@ -9,7 +12,8 @@ import {
   ArrowRightOutlined,
   ArrowLeftOutlined,
 } from '@ant-design/icons';
-import { Dropdown, Table, Button, Input } from 'antd';
+import { Dropdown, Table, Button, Input, DatePicker, Select } from 'antd';
+const { RangePicker } = DatePicker;
 import { PageHeader } from '@ant-design/pro-layout';
 
 import { useSelector, useDispatch } from 'react-redux';
@@ -22,6 +26,8 @@ import { useMoney, useDate } from '@/settings';
 import { generate as uniqueId } from 'shortid';
 
 import { useCrudContext } from '@/context/crud';
+
+// import { erp } from '@/redux/erp/actions';
 
 import { Tag } from 'antd';
 import 'antd/dist/reset.css';
@@ -67,11 +73,13 @@ const statusColors = {
 };
 
 function AddNewItem({ config }) {
+  const dispatch = useDispatch();
   const { crudContextAction } = useCrudContext();
   const { collapsedBox, panel } = crudContextAction;
   const { ADD_NEW_ENTITY } = config;
 
   const handelClick = () => {
+    dispatch(erp.currentAction({ actionType: 'create', data: {} }));
     panel.open();
     collapsedBox.close();
   };
@@ -82,8 +90,11 @@ function AddNewItem({ config }) {
     </Button>
   );
 }
-export default function DataTable({ config, extra = [] }) {
-  let { entity, dataTableColumns, DATATABLE_TITLE, fields, searchConfig } = config;
+
+export default function DataTable(props) {
+  const list = useSelector(selectListItems);
+  const { config, extra = [] } = props;
+  const { entity, dataTableColumns, DATATABLE_TITLE, fields, searchConfig } = config;
   const { crudContextAction } = useCrudContext();
   const { panel, collapsedBox, modal, readBox, editBox, advancedBox } = crudContextAction;
   const translate = useLanguage();
@@ -190,12 +201,24 @@ export default function DataTable({ config, extra = [] }) {
     dispatchColumns = [...dataTableColumns];
   }
 
-  dataTableColumns = [
+  // FIX: Use a new variable instead of reassigning dataTableColumns
+  const finalColumns = [
     ...dispatchColumns,
+    {
+      title: translate('Created At'),
+      dataIndex: 'created',
+      key: 'created',
+      render: (createdAt) => (createdAt ? moment(createdAt).fromNow() : '-'),
+    },
     {
       title: '',
       key: 'action',
       fixed: 'right',
+      onCell: () => ({
+        onClick: (e) => {
+          e.stopPropagation();
+        },
+      }),
       render: (_, record) => (
         <Dropdown
           menu={{
@@ -208,45 +231,48 @@ export default function DataTable({ config, extra = [] }) {
                 case 'edit':
                   handleEdit(record);
                   break;
-
                 case 'delete':
                   handleDelete(record);
                   break;
                 case 'updatePassword':
                   handleUpdatePassword(record);
                   break;
-
                 default:
                   break;
               }
-              // else if (key === '2')handleCloseTask
             },
           }}
           trigger={['click']}
         >
-          <EllipsisOutlined
+          <span
             style={{ cursor: 'pointer', fontSize: '24px' }}
-            onClick={(e) => e.preventDefault()}
-          />
+          >
+            <EllipsisOutlined />
+          </span>
         </Dropdown>
       ),
     },
   ];
 
-  const { result: listResult, isLoading: listIsLoading } = useSelector(selectListItems);
-
-  const { pagination, items: dataSource } = listResult;
+  const dataSource = list.result?.items || [];
+  const pagination = list.result?.pagination || {};
+  const listIsLoading = list.isLoading;
 
   const dispatch = useDispatch();
 
   const handelDataTableLoad = useCallback(
-    (pagination) => {
-      const options = { page: pagination.current || 1, items: pagination.pageSize || 10 };
-      dispatch(crud.list({ entity, options }));
-    },
-    []
+  (pagination) => {
+    const options = {
+      page: pagination.current || 1,
+      items: pagination.pageSize || 10,
+      sortBy: 'created',
+      sortValue: 'asc',
+    };
+    dispatch(crud.list({ entity, options }));
+  },
+  []
+);
 
-  );
 
   const filterTable = (e) => {
     const value = e.target.value;
@@ -255,8 +281,13 @@ export default function DataTable({ config, extra = [] }) {
   };
 
   const dispatcher = () => {
-    dispatch(crud.list({ entity }));
+  const options = {
+    sortBy: 'created',
+    sortValue: 'desc',
   };
+  dispatch(crud.list({ entity, options }));
+};
+
 
   useEffect(() => {
     const controller = new AbortController();
@@ -265,6 +296,31 @@ export default function DataTable({ config, extra = [] }) {
       controller.abort();
     };
   }, []);
+
+  // Filter state and options
+  const [dateRange, setDateRange] = useState([]);
+  const [selectedAgents, setSelectedAgents] = useState([]);
+  const [selectedStatus, setSelectedStatus] = useState([]);
+  const { userOptions = [], statusOptions = [] } = props.filterOptions || {};
+  // console.log('userOptions', userOptions);
+  // console.log('statusOptions', statusOptions);
+
+  // Filtering logic
+  const handleFilter = () => {
+    const params = {};
+    if (Array.isArray(dateRange) && dateRange.length === 2) {
+      params.created_gte = dateRange[0].startOf('day').toISOString();
+      params.created_lte = dateRange[1].endOf('day').toISOString();
+    }
+    if (selectedAgents && selectedAgents.length) params.assigned = selectedAgents.join(',');
+    if (selectedStatus && selectedStatus.length) params.status = selectedStatus.join(',');
+    dispatch(crud.list({ entity: config.entity, options: params }));
+  };
+
+  useEffect(() => {
+    handleFilter();
+    // eslint-disable-next-line
+  }, [dateRange, selectedAgents, selectedStatus]);
 
   return (
     <>
@@ -275,30 +331,58 @@ export default function DataTable({ config, extra = [] }) {
         ghost={false}
         extra={[
           <Input
-            key={`searchFilterDataTable}`}
+            key="search"
             onChange={filterTable}
             placeholder={translate('search')}
             allowClear
+            style={{ width: 180 }}
           />,
-          <Button onClick={handelDataTableLoad} key={`${uniqueId()}`} icon={<RedoOutlined />}>
-            {translate('Refresh')}
-          </Button>,
-
+          <RangePicker
+            key="date"
+            onChange={val => setDateRange(val || [])}
+            value={dateRange}
+            style={{ width: 220 }}
+          />,
+          <Select
+            key="agents"
+            mode="multiple"
+            allowClear
+            placeholder="Agent(s)"
+            style={{ width: 160 }}
+            options={userOptions}
+            value={selectedAgents}
+            onChange={setSelectedAgents}
+          />,
+          <Select
+            key="status"
+            mode="multiple"
+            allowClear
+            placeholder="Status"
+            style={{ width: 160 }}
+            options={statusOptions}
+            value={selectedStatus}
+            onChange={setSelectedStatus}
+          />,
+          // <Button onClick={handelDataTableLoad} key={`${uniqueId()}`} icon={<RedoOutlined />}>
+          //   {translate('Refresh')}
+          // </Button>,
           <AddNewItem key={`${uniqueId()}`} config={config} />,
         ]}
         style={{
           padding: '20px 0px',
         }}
-      ></PageHeader>
-
+      />
       <Table
-        columns={dataTableColumns}
+        columns={finalColumns}
         rowKey={(item) => item._id}
         dataSource={dataSource}
         pagination={pagination}
         loading={listIsLoading}
         onChange={handelDataTableLoad}
         scroll={{ x: true }}
+        onRow={(record) => ({
+          onClick: () => handleRead(record),
+        })}
       />
     </>
   );
