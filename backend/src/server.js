@@ -39,3 +39,11 @@ app.set('port', process.env.PORT || 8888);
 const server = app.listen(app.get('port'), () => {
   console.log(`Express running → On PORT : ${server.address().port}`);
 });
+
+app.get('/', (req, res) => {
+  res.send('✅ Backend is working');
+});
+
+app.get('/api/test', (req, res) => {
+  res.json({ success: true, message: 'API test working' });
+});
