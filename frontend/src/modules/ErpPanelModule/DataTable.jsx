@@ -24,8 +24,6 @@ import { useNavigate } from 'react-router-dom';
 
 import { DOWNLOAD_BASE_URL } from '@/config/serverApiConfig';
 
-import { erp } from '@/redux/erp/actions';
-
 function AddNewItem({ config }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
